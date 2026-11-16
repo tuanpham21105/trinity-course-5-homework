@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dungeon Clicker · Technovas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Lexend:wght@400;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --night: #1C1A2B;      /* dungeon stone */
+    --wall: #2A2740;       /* darker panel edge */
+    --parchment: #EFE3C8;  /* panels */
+    --ink: #2B2118;        /* text on parchment */
+    --torch: #E39B32;      /* light, buttons */
+    --blood: #C0392B;      /* monster HP, errors */
+    --coin: #F2C14E;       /* gold */
+    --moss: #4E7D5B;       /* success, xp */
+    --faded: #8A7B63;      /* secondary text */
+    --code-bg: #171522;
+    --display: 'Pixelify Sans', 'Courier New', monospace;
+    --body: 'Lexend', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; font-family: var(--body); color: var(--ink);
+    background: radial-gradient(ellipse at 30% 0%, #322E4A 0%, var(--night) 60%);
+  }
+  button { font: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid var(--torch); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: .9em; }
+
+  /* Brand bar */
+  .brand {
+    display: flex; align-items: baseline; gap: 10px; padding: 14px 20px 0; max-width: 1480px; margin: 0 auto;
+    font-family: var(--display); color: var(--torch); font-size: 22px; letter-spacing: 1px;
+  }
+  .brand .tech { color: #9C93D6; font-size: 16px; letter-spacing: 2px; }
+
+  /* Page layout: one column, the Quest Log opens in a modal */
+  .layout { max-width: 1180px; margin: 0 auto; padding: 16px 20px 90px; }
+
+  /* Hero bar */
+  .hero-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; color: var(--parchment); padding: 4px 4px 18px; }
+  .hero-bar h1 { font-family: var(--display); font-size: 28px; margin: 0; color: var(--parchment); letter-spacing: 1px; }
+  .stat { font-family: var(--display); font-size: 20px; }
+  .stat small { font-family: var(--body); font-size: 12px; color: #B8AC94; display: block; }
+  .coin { color: var(--coin); }
+  .xp { flex: 1; min-width: 180px; }
+  .xp-track { height: 10px; background: var(--wall); border-radius: 5px; overflow: hidden; margin-top: 4px; }
+  .xp-fill { height: 100%; width: 0; background: var(--moss); transition: width .3s; }
+  .badge { font-size: 12px; padding: 3px 8px; border-radius: 10px; background: #3B3560; color: #D9D3FF; }
+  .badge.vet { background: #6B4E1E; color: var(--coin); }
+  .ghost { background: none; border: 1px solid #5A5478; color: #B8AC94; border-radius: 6px; padding: 6px 12px; font-size: 13px; }
+
+  /* Game grid */
+  .grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; }
+  .side { display: grid; gap: 20px; align-content: start; }
+  .panel { position: relative; background: var(--parchment); border-radius: 6px; padding: 18px; box-shadow: 0 0 0 3px var(--wall), 0 6px 0 3px #12101C; }
+  .panel h2 { font-family: var(--display); font-size: 22px; margin: 0 0 12px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+  /* Arena */
+  .arena {
+    background: radial-gradient(circle at 50% 45%, #5B3A1E 0%, #2D2033 55%, #1A1626 100%);
+    color: var(--parchment); text-align: center; min-height: 430px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
+  }
+  .arena h2 { color: var(--torch); }
+  .monster { font-size: 150px; line-height: 1; background: none; border: none; padding: 10px 30px; filter: drop-shadow(0 10px 18px rgba(0,0,0,.55)); user-select: none; }
+  .monster.hit { animation: hit .18s; }
+  .monster.spawn { animation: spawn .35s; }
+  @keyframes hit { 0%,100% { transform: translateX(0) } 30% { transform: translateX(-10px) rotate(-4deg) } 70% { transform: translateX(8px) rotate(3deg) } }
+  @keyframes spawn { from { transform: scale(.2); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+  .hp-track { width: min(320px, 80%); height: 16px; background: #120F1A; border-radius: 8px; overflow: hidden; border: 2px solid #3B3352; }
+  .hp-fill { height: 100%; background: var(--blood); transition: width .15s; }
+  .hp-text { font-family: var(--display); font-size: 16px; margin: 6px 0 0; }
+  .hint { font-size: 14px; color: #CDBF9F; margin-top: 14px; }
+  .float { position: fixed; pointer-events: none; font-family: var(--display); font-size: 28px; color: var(--coin); text-shadow: 0 2px 0 #000; animation: float .8s forwards; z-index: 10; }
+  .float.reward { color: #9FE0AE; font-size: 22px; }
+  @keyframes float { to { transform: translateY(-60px); opacity: 0 } }
+
+  /* Shop */
+  .items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .item { border: 2px solid #D9C9A6; border-radius: 6px; padding: 10px; background: #F7EEDB; }
+  .item-top { display: flex; gap: 10px; align-items: center; }
+  .item-icon { font-size: 30px; }
+  .item-name { font-weight: 600; font-size: 14px; }
+  .item-atk { font-size: 13px; color: var(--moss); }
+  .buy { margin-top: 8px; width: 100%; border: none; border-radius: 4px; padding: 7px; font-weight: 600; background: var(--torch); color: var(--ink); }
+  .buy:disabled { background: #D9C9A6; color: var(--faded); cursor: not-allowed; }
+  .pager { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 14px; }
+  .pager button { background: none; border: 2px solid var(--ink); border-radius: 4px; padding: 3px 10px; }
+  .pager button:disabled { opacity: .35; cursor: default; }
+
+  /* Bag */
+  .bag { display: flex; flex-wrap: wrap; gap: 8px; }
+  .slot { background: #F7EEDB; border: 2px solid #D9C9A6; border-radius: 6px; padding: 6px 10px; font-size: 14px; }
+  .slot b { font-family: var(--display); }
+  .empty { color: var(--faded); font-size: 14px; margin: 0; }
+
+  /* Leaderboard */
+  .board { margin-top: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th { text-align: left; font-size: 13px; color: var(--faded); font-weight: 400; padding: 4px 8px; }
+  td { padding: 7px 8px; border-top: 1px solid #D9C9A6; }
+  td.rank { font-family: var(--display); width: 50px; }
+  tr.me td { background: #F6DFA8; font-weight: 600; }
+
+  /* Locked panels */
+  .lock {
+    position: absolute; inset: 0; border-radius: 6px; background: rgba(28,26,43,.94); color: var(--parchment);
+    display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 20px; z-index: 2;
+  }
+  .panel.locked .lock { display: flex; }
+  .lock strong { font-family: var(--display); font-size: 22px; color: var(--torch); }
+  .lock code { background: #0F0D18; padding: 4px 8px; border-radius: 4px; margin: 10px 0 4px; font-size: 13px; }
+  .lock p { margin: 6px 0 12px; font-size: 13px; color: #CDBF9F; max-width: 320px; }
+  .lock button { background: var(--torch); border: none; border-radius: 4px; padding: 6px 16px; font-weight: 600; }
+
+  /* Start screen */
+  .start { max-width: 460px; margin: 10vh auto 0; text-align: center; }
+  .start h1 { font-family: var(--display); font-size: 46px; color: var(--torch); margin: 0; line-height: 1.1; }
+  .start .tech { font-family: var(--display); color: #9C93D6; letter-spacing: 4px; margin: 4px 0 14px; }
+  .start p { color: #CDBF9F; margin: 0 0 24px; }
+  .start form { display: flex; gap: 8px; }
+  .start input { flex: 1; font: inherit; padding: 10px 12px; border-radius: 6px; border: 2px solid var(--wall); background: var(--parchment); }
+  .start button { background: var(--torch); border: none; border-radius: 6px; padding: 10px 16px; font-weight: 600; }
+  .error { color: #FF9C8F; font-size: 14px; min-height: 20px; margin-top: 10px; }
+
+  /* ───────── Quest Log (modal) ───────── */
+  .ql-fab {
+    position: fixed; right: 20px; bottom: 20px; z-index: 30;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    border: none; border-radius: 10px; padding: 10px 16px;
+    background: var(--torch); color: var(--ink);
+    box-shadow: 0 6px 0 #12101C; font-weight: 700;
+  }
+  .ql-fab span { font-size: 13px; }
+  .ql-fab b { font-family: var(--display); font-size: 18px; }
+  .ql-fab small { font-size: 11px; opacity: .8; }
+  .modal { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 20px; }
+  .modal-backdrop { position: absolute; inset: 0; background: rgba(12,10,20,.72); backdrop-filter: blur(2px); }
+  .ql-card {
+    position: relative; width: min(760px, 100%); max-height: min(88vh, 1000px); overflow: auto;
+    background: var(--parchment); border-radius: 8px; box-shadow: 0 0 0 3px var(--wall), 0 10px 0 3px #12101C;
+  }
+  .ql-head { position: sticky; top: 0; z-index: 3; background: var(--parchment); padding: 16px 18px 12px; border-bottom: 2px solid #D9C9A6; }
+  .ql-head h2 { font-family: var(--display); font-size: 24px; margin: 0; display: flex; align-items: center; gap: 10px; }
+  .ql-head h2 small { font-family: var(--body); font-size: 13px; color: var(--faded); font-weight: 400; margin-left: auto; }
+  .ql-close { width: 32px; height: 32px; border: none; border-radius: 6px; background: #D9C9A6; color: var(--ink); font-size: 15px; }
+  .ql-progress { height: 8px; background: #D9C9A6; border-radius: 4px; overflow: hidden; margin: 10px 0 8px; }
+  .ql-progress div { height: 100%; width: 0; background: var(--moss); transition: width .4s; }
+  .ql-head p { margin: 0; font-size: 13px; color: var(--faded); }
+  .ql-tools { display: flex; gap: 8px; margin-top: 10px; }
+  .ql-tools button { font-size: 12px; border: 1px solid var(--faded); background: none; border-radius: 4px; padding: 4px 10px; color: var(--ink); }
+
+  .quest { border-bottom: 1px solid #D9C9A6; }
+  .q-head { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: none; padding: 12px 18px; }
+  .q-icon { width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 15px; background: #D9C9A6; font-family: var(--display); }
+  .q-title { flex: 1; }
+  .q-title b { display: block; font-size: 15px; }
+  .q-title span { font-size: 12px; color: var(--faded); }
+  .q-chev { color: var(--faded); transition: transform .2s; }
+  .quest.open .q-chev { transform: rotate(90deg); }
+  .quest.passed .q-icon { background: var(--moss); color: #fff; }
+  .quest.current .q-icon { background: var(--torch); }
+  .quest.current { background: #F7EEDB; }
+  .quest.later .q-head { opacity: .6; }
+
+  .q-body { display: none; padding: 0 18px 18px 58px; font-size: 14px; line-height: 1.55; }
+  .quest.open .q-body { display: block; }
+  .q-body h4 { margin: 14px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .5px; color: var(--faded); }
+  .q-body p { margin: 6px 0; }
+  .q-body ol, .q-body ul { margin: 6px 0; padding-left: 20px; }
+  .q-body li { margin: 6px 0; }
+  .q-body :not(pre) > code { background: #E4D5B3; padding: 1px 5px; border-radius: 3px; }
+  .learn { background: #E9F0E6; border-left: 4px solid var(--moss); padding: 8px 12px; border-radius: 0 4px 4px 0; margin: 8px 0; }
+  .warn { background: #F8E3D9; border-left: 4px solid var(--blood); padding: 8px 12px; border-radius: 0 4px 4px 0; margin: 8px 0; }
+  .api { font-family: var(--mono); font-size: 12.5px; background: #E4D5B3; border-radius: 4px; padding: 8px 10px; margin: 6px 0; white-space: pre-wrap; }
+
+  .snippet { position: relative; margin: 8px 0; }
+  .snippet .file { font-family: var(--mono); font-size: 11.5px; color: var(--parchment); background: #3B3560; display: inline-block; padding: 2px 8px; border-radius: 4px 4px 0 0; }
+  .snippet pre {
+    margin: 0; background: var(--code-bg); color: #E8E2F5; padding: 10px 12px; border-radius: 0 4px 4px 4px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre;
+  }
+  .snippet .copy { position: absolute; top: 22px; right: 6px; font-size: 11px; border: none; border-radius: 3px; padding: 2px 8px; background: #3B3560; color: var(--parchment); }
+
+  .map { border-bottom: 1px solid #D9C9A6; padding: 10px 18px; font-size: 13.5px; }
+  .map summary { cursor: pointer; font-weight: 600; }
+  .map pre { font-family: var(--mono); font-size: 11.5px; line-height: 1.5; background: var(--code-bg); color: #E8E2F5; padding: 10px 12px; border-radius: 4px; overflow-x: auto; }
+  .files { background: #E4D5B3; border-radius: 4px; padding: 6px 10px; font-size: 13px; }
+
+  details.hint-box { margin: 10px 0; border: 1px dashed var(--faded); border-radius: 4px; padding: 6px 10px; }
+  details.hint-box summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+
+  .manual { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; font-size: 13.5px; }
+  .manual input { margin-top: 4px; }
+
+  .run { margin-top: 14px; border: none; border-radius: 4px; padding: 8px 18px; font-weight: 600; background: var(--torch); color: var(--ink); }
+  .run:disabled { opacity: .6; cursor: progress; }
+  .results { list-style: none; padding: 0 !important; margin: 10px 0 0 !important; font-size: 13px; }
+  .results li { margin: 4px 0; }
+  .results .ok::before { content: '✅ '; }
+  .results .bad::before { content: '❌ '; }
+  .results .star::before { content: '⭐ '; }
+  .results .info::before { content: 'ℹ️ '; }
+  .fail-box { background: #F8E3D9; border-radius: 4px; padding: 8px 10px; margin: 6px 0 0; font-size: 12.5px; }
+  .fail-box pre { white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 11.5px; margin: 4px 0; background: #fff8f2; padding: 6px; border-radius: 3px; max-height: 160px; overflow: auto; }
+  .fail-box .tip { margin-top: 6px; }
+  .done-banner { background: var(--moss); color: #fff; border-radius: 4px; padding: 8px 12px; margin-top: 10px; font-weight: 600; }
+
+  /* Toast */
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--parchment); padding: 10px 18px; border-radius: 6px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 20; }
+  .toast.show { opacity: 1; }
+  .toast.bad { background: var(--blood); }
+
+  [hidden] { display: none !important; }
+  @media (max-width: 800px) { .monster { font-size: 110px; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="brand">⚔️ Dungeon Clicker <span class="tech">· TECHNOVAS</span></div>
+
+<div class="layout">
+<div>
+  <!-- Start screen: Step 1 -->
+  <section class="start" id="startScreen" hidden>
+    <h1>Dungeon Clicker</h1>
+    <div class="tech">TECHNOVAS</div>
+    <p>Name your hero, defeat monsters, buy better weapons, and climb the leaderboard.</p>
+    <form id="startForm">
+      <input id="heroName" maxlength="20" placeholder="Hero name" aria-label="Hero name" required>
+      <button type="submit">Start adventure</button>
+    </form>
+    <div class="error" id="startError"></div>
+  </section>
+
+  <!-- Game screen -->
+  <main id="gameScreen" hidden>
+    <header class="hero-bar">
+      <h1 id="heroTitle">Hero</h1>
+      <div class="stat"><span id="statLevel">1</span><small>Level</small></div>
+      <div class="stat coin"><span id="statGold">0</span><small>Gold</small></div>
+      <div class="stat"><span id="statAttack">1</span><small>Attack</small></div>
+      <div class="xp">
+        <small id="xpLabel" style="font-size:12px;color:#B8AC94">XP</small>
+        <div class="xp-track"><div class="xp-fill" id="xpFill"></div></div>
+      </div>
+      <button class="ghost" id="newHero">New hero</button>
+    </header>
+
+    <div class="grid">
+      <section class="panel arena" id="arenaPanel">
+        <h2 id="monsterName">Monster</h2>
+        <button class="monster" id="monster" aria-label="Attack the monster">🟢</button>
+        <div class="hp-track"><div class="hp-fill" id="hpFill" style="width:100%"></div></div>
+        <p class="hp-text" id="hpText">HP</p>
+        <p class="hint">Click the monster to attack. Better weapons hit harder.</p>
+        <div class="lock"><strong>🔒 Fighting is locked</strong><code>POST /players/:id/attack</code><p>Finish Step 3 in the Quest Log, then press Retry.</p><button data-retry="arena">Retry</button></div>
+      </section>
+
+      <div class="side">
+        <section class="panel" id="shopPanel">
+          <h2>Shop</h2>
+          <div class="items" id="items"></div>
+          <div class="pager">
+            <button id="shopPrev" aria-label="Previous page">‹</button>
+            <span id="shopPage">Page 1</span>
+            <button id="shopNext" aria-label="Next page">›</button>
+          </div>
+          <div class="lock"><strong>🔒 Shop is locked</strong><code>GET /items?page=1&amp;limit=4</code><p>Finish Step 1 in the Quest Log, then press Retry.</p><button data-retry="shop">Retry</button></div>
+        </section>
+
+        <section class="panel" id="bagPanel">
+          <h2>Bag</h2>
+          <div class="bag" id="bag"></div>
+          <div class="lock"><strong>🔒 Bag is locked</strong><code>GET /players/:id/inventory</code><p>Finish Step 4 in the Quest Log, then press Retry.</p><button data-retry="bag">Retry</button></div>
+        </section>
+      </div>
+    </div>
+
+    <section class="panel board" id="boardPanel">
+      <h2>Leaderboard</h2>
+      <table>
+        <thead><tr><th>Rank</th><th>Hero</th><th>Level</th><th>XP</th><th>Attack</th><th>Gold</th></tr></thead>
+        <tbody id="boardRows"></tbody>
+      </table>
+      <div class="pager">
+        <button id="boardPrev" aria-label="Previous page">‹</button>
+        <span id="boardPage">Page 1</span>
+        <button id="boardNext" aria-label="Next page">›</button>
+      </div>
+      <div class="lock"><strong>🔒 Leaderboard is locked</strong><code>GET /leaderboard?page=1&amp;limit=5</code><p>Finish Step 5 in the Quest Log, then press Retry.</p><button data-retry="board">Retry</button></div>
+    </section>
+  </main>
+</div>
+
+<!-- ═════════════════════════ QUEST LOG ═════════════════════════ -->
+<button class="ql-fab" id="openQuest" type="button" aria-haspopup="dialog">
+  <span>📜 Quest Log</span>
+  <b id="qlFabCount">0 / 6 finished</b>
+  <small id="qlFabNext">Next: Step 0 of 6</small>
+</button>
+
+<div class="modal" id="questModal" hidden>
+  <div class="modal-backdrop" data-close-quest></div>
+  <div class="ql-card" role="dialog" aria-modal="true" aria-label="Quest Log">
+  <div class="ql-head">
+    <h2>📜 Quest Log <small id="qlCount">0 / 6 finished</small><button class="ql-close" id="closeQuest" type="button" aria-label="Close quest log">✕</button></h2>
+    <div class="ql-progress"><div id="qlBar"></div></div>
+    <p id="qlNext">Recommended: Step 0 of 6 — Connect to PostgreSQL</p>
+    <div class="ql-tools">
+      <button id="recheckAll">Re-check all steps</button>
+      <button id="expandAll">Open all steps</button>
+    </div>
+  </div>
+
+  <details class="map">
+    <summary>🗺️ Where do I write code?</summary>
+    <p>Each file already has a <code>// STEP n</code> comment. Read the expected result, then write the code yourself.</p>
+<pre>src/
+├─ main.ts                        Step 1 (validation)
+├─ app.module.ts                  Step 0 (database connection)
+├─ game.module.ts                  Steps 1, 2, 4
+├─ game.controller.ts              Steps 0–5
+├─ game.service.ts                 Steps 1–5
+├─ common/dto/page-query.dto.ts    Step 1
+├─ entities/
+│  ├─ item.entity.ts               Step 1
+│  ├─ player.entity.ts             Step 2
+│  └─ inventory-item.entity.ts     Step 4
+└─ database/
+   ├─ db.config.ts                 ready (change only if needed)
+   ├─ data-source.ts               Step 0
+   └─ migrations/                  created by migration:generate</pre>
+    <p><b>Flow of a request:</b> <code>controller</code> (URL + body) → <code>service</code> (game logic + database) → <code>repository</code> (SQL) → PostgreSQL.</p>
+  </details>
+
+  <!-- ───── STEP 0 ───── -->
+  <article class="quest" data-step="0">
+    <button class="q-head"><span class="q-icon">0</span><span class="q-title"><b>Connect to PostgreSQL</b><span>TypeORM connection · health check</span></span><span class="q-chev">▶</span></button>
+    <div class="q-body">
+      <p><b>Goal:</b> the NestJS app can talk to PostgreSQL.</p>
+      <p class="files">✏️ Files: <code>src/app.module.ts</code>, <code>src/database/data-source.ts</code>, <code>src/game.controller.ts</code></p>
+      <div class="learn"><b>TypeORM</b> maps classes to tables. <b>DataSource</b> is the object that knows how to connect.</div>
+
+      <h4>Do this</h4>
+      <ol>
+        <li>Start the database once:
+          <script type="text/plain" class="code" data-file="terminal">docker run --name dungeon-db -e POSTGRES_USER=dungeon -e POSTGRES_PASSWORD=dungeon -e POSTGRES_DB=dungeon -p 5432:5432 -d postgres:16</script>
+          Next time just run <code>docker start dungeon-db</code>.
+        </li>
+        <li>The packages are already in <code>package.json</code>. Run <code>npm install</code> once.</li>
+        <li>Open <code>src/database/db.config.ts</code>. The local user, password and database are already set.</li>
+      </ol>
+
+      <h4>Expected result</h4>
+      <div class="api">GET /health  →  200 { "db": "up" }
+
+The migration CLI will use src/database/data-source.ts (tested in Step 1).</div>
+
+      <h4>Hints</h4>
+      <ul>
+        <li><code>app.module.ts</code>: add <code>TypeOrmModule.forRoot({ ...dbConfig, autoLoadEntities: true, synchronize: false })</code>.</li>
+        <li><code>game.controller.ts</code>: add <code>@Get('health')</code>. Inject <code>DataSource</code> and run <code>await dataSource.query('SELECT 1')</code>.</li>
+        <li><code>data-source.ts</code>: export a default <code>new DataSource({ ...dbConfig, entities: ['src/**/*.entity.ts'], migrations: ['src/database/migrations/*.ts'] })</code>.</li>
+      </ul>
+
+      <details class="hint-box"><summary>💡 Stuck?</summary>
+        <ul>
+          <li><b>Unable to connect</b>: is Docker running? Check <code>docker ps</code>.</li>
+          <li>Port 5432 is busy? Use <code>-p 5433:5432</code> and change <code>port</code> in <code>db.config.ts</code>.</li>
+        </ul>
+      </details>
+      <button class="run">Run check</button>
+      <ul class="results"></ul>
+    </div>
+  </article>
+
+  <!-- ───── STEP 1 ───── -->
+  <article class="quest" data-step="1">
+    <button class="q-head"><span class="q-icon">1</span><span class="q-title"><b>Build the shop</b><span>First migration · seed data · pagination</span></span><span class="q-chev">▶</span></button>
+    <div class="q-body">
+      <p><b>Goal:</b> create the <code>item</code> table, insert 8 items with the <b>first migration</b>, then list them page by page.</p>
+      <p class="files">✏️ Files: <code>src/entities/item.entity.ts</code>, a new migration, <code>src/common/dto/page-query.dto.ts</code>, <code>src/game.module.ts</code>, <code>src/game.service.ts</code>, <code>src/game.controller.ts</code>, <code>src/main.ts</code></p>
+      <div class="learn"><b>Migration</b> = versioned SQL. <b>Seed</b> = rows inserted by a migration. <b>Pagination</b> = <code>LIMIT</code> + <code>OFFSET</code>, never the whole table.</div>
+
+      <h4>Expected result</h4>
+      <div class="api">GET /items?page=1&limit=4
+→ 200 { "data": [4 items], "page": 1, "limit": 4, "total": 8 }
+
+GET /items?page=2&limit=4  → the next 4 items
+GET /items                 → page 1, limit 10 (all 8 items)
+GET /items?page=1&limit=1000 → 400 (or limit capped at 20)
+
+Item = { "id": 1, "name": "Wooden Dagger", "icon": "🗡️", "attack": 1, "price": 15 }</div>
+
+      <h4>Seed data (use these exact rows)</h4>
+      <div class="api">1  Wooden Dagger  🗡️  attack 1   price 15
+2  Iron Sword     ⚔️  attack 3   price 40
+3  Hunter Bow     🏹  attack 4   price 60
+4  Battle Axe     🪓  attack 5   price 75
+5  War Hammer     🔨  attack 8   price 130
+6  Magic Wand     🪄  attack 12  price 200
+7  Sea Trident    🔱  attack 18  price 320
+8  Dragon Blade   🔥  attack 30  price 600</div>
+
+      <h4>Hints</h4>
+      <ul>
+        <li><b>Item entity:</b> <code>id</code> (primary generated), <code>name</code>, <code>icon</code>, <code>attack</code> (int), <code>price</code> (int).</li>
+        <li><b>Migration:</b> generate <code>CreateItem</code>, open the new file, add the 8 <code>INSERT INTO "item" ...</code> rows at the end of <code>up()</code>, then run it.</li>
+        <li><b>PageQueryDto:</b> <code>page</code> default 1, <code>limit</code> default 10 with <code>@Max(20)</code>. Query values are strings, so use <code>@Type(() => Number)</code>.</li>
+        <li><b>Service:</b> <code>findAndCount({ order: { id: 'ASC' }, skip: (page - 1) * limit, take: limit })</code>.</li>
+        <li><b>main.ts:</b> turn on <code>new ValidationPipe({ transform: true })</code>.</li>
+        <li><b>Module:</b> add <code>TypeOrmModule.forFeature([Item])</code>.</li>
+      </ul>
+
+      <details class="hint-box"><summary>💡 Stuck?</summary>
+        <ul>
+          <li>“No changes found”: the file must end with <code>.entity.ts</code> and be decorated with <code>@Entity()</code>.</li>
+          <li>Ran the migration before adding the INSERT? <code>migration:revert</code>, fix, then run again.</li>
+          <li><code>page</code> stays a string? Add <code>@Type(() => Number)</code> and <code>transform: true</code>.</li>
+        </ul>
+      </details>
+      <button class="run">Run check</button>
+      <ul class="results"></ul>
+    </div>
+  </article>
+
+  <!-- ───── STEP 2 ───── -->
+  <article class="quest" data-step="2">
+    <button class="q-head"><span class="q-icon">2</span><span class="q-title"><b>Create a hero</b><span>Entity · second migration · INSERT + SELECT</span></span><span class="q-chev">▶</span></button>
+    <div class="q-body">
+      <p><b>Goal:</b> save a hero in the database and read it back.</p>
+      <p class="files">✏️ Files: <code>src/entities/player.entity.ts</code>, a new migration, <code>src/game.module.ts</code>, <code>src/game.service.ts</code>, <code>src/game.controller.ts</code></p>
+      <div class="learn">You do <b>not</b> need a second DTO file. A short name check inside the service is enough for this homework.</div>
+
+      <h4>Expected result</h4>
+      <div class="api">POST /players  body { "name": "Mia" }
+→ 201 Player
+→ 400 if the name is missing, shorter than 2 or longer than 20
+
+GET /players/:id  → 200 Player
+→ 404 if the player does not exist
+→ 400 for /players/abc
+
+Player = { "id": 1, "name": "Mia", "level": 1, "xp": 0, "gold": 0,
+           "attack": 1, "kills": 0,
+           "monster": { "name": "Slime", "icon": "🟢", "hp": 8, "maxHp": 8 } }</div>
+
+      <h4>Monsters (use these exact names)</h4>
+      <div class="api">kills % 5 = 0 → Slime 🟢
+kills % 5 = 1 → Goblin 👺
+kills % 5 = 2 → Skeleton 💀
+kills % 5 = 3 → Orc 👹
+kills % 5 = 4 → Dragon 🐉</div>
+
+      <h4>Hints</h4>
+      <ul>
+        <li><b>Player columns:</b> <code>id</code>, <code>name</code>, <code>gold</code>/<code>xp</code>/<code>kills</code> (default 0), <code>monsterHp</code> (nullable int).</li>
+        <li>Generate and run a <code>CreatePlayer</code> migration.</li>
+        <li><b>Service:</b> <code>save(create({ name }))</code> and <code>findOneBy({ id })</code>. Throw <code>NotFoundException</code> when it is <code>null</code>.</li>
+        <li><b>Calculated fields:</b> level = <code>1 + floor(xp / 100)</code>; attack starts at 1; monster = <code>monsters[kills % 5]</code>; maxHp = <code>8 + kills * 4</code>; <code>hp = monsterHp ?? maxHp</code>.</li>
+        <li><b>Controller:</b> <code>@Post('players')</code> and <code>@Get('players/:id')</code> with <code>ParseIntPipe</code>.</li>
+        <li>Add <code>Player</code> to <code>TypeOrmModule.forFeature([...])</code>.</li>
+      </ul>
+
+      <details class="hint-box"><summary>💡 Stuck?</summary>
+        <ul>
+          <li><b>relation "player" does not exist</b>: run the migration.</li>
+          <li><code>id</code> comes back as <code>"1"</code>: use <code>@PrimaryGeneratedColumn()</code>, not <code>bigint</code>.</li>
+        </ul>
+      </details>
+      <button class="run">Run check</button>
+      <ul class="results"></ul>
+    </div>
+  </article>
+
+  <!-- ───── STEP 3 ───── -->
+  <article class="quest" data-step="3">
+    <button class="q-head"><span class="q-icon">3</span><span class="q-title"><b>Fight a monster</b><span>UPDATE a row · server decides the reward</span></span><span class="q-chev">▶</span></button>
+    <div class="q-body">
+      <p><b>Goal:</b> each click hits the monster and saves the new state.</p>
+      <p class="files">✏️ Files: <code>src/game.service.ts</code>, <code>src/game.controller.ts</code></p>
+      <div class="learn"><b>Load → change → save.</b> The request has no body. Never trust the client with gold or damage.</div>
+
+      <h4>Game rules</h4>
+      <ul>
+        <li>damage = the player's attack (1 for now).</li>
+        <li>Monster HP goes down, never below 0.</li>
+        <li>At 0 HP: gold <code>+ (5 + kills × 2)</code>, xp <code>+ 25</code>, kills <code>+ 1</code>, <code>monsterHp = null</code>.</li>
+      </ul>
+
+      <h4>Expected result</h4>
+      <div class="api">POST /players/:id/attack   (no body)
+→ 200/201 { "damage": 1, "defeated": false, "reward": null, "player": Player }
+→ 8th hit on a Slime: "defeated": true, "reward": { "gold": 5, "xp": 25 }
+→ 404 if the player does not exist
+
+The next GET /players/:id must show the new gold.</div>
+
+      <h4>Hints</h4>
+      <ul>
+        <li>Reuse the monster helper from Step 2: <code>hp = monsterHp ?? maxHpFor(kills)</code>.</li>
+        <li>After changing the player, call <code>save(player)</code>. Returning the object is not enough.</li>
+        <li><code>@Post('players/:id/attack')</code> with <code>@Param('id', ParseIntPipe)</code>.</li>
+      </ul>
+
+      <details class="hint-box"><summary>💡 Stuck?</summary>
+        <ul>
+          <li>Gold is right in the response but wrong in the next GET? You forgot to <code>save()</code>.</li>
+          <li>Slime has 8 HP. The 8th hit must kill it.</li>
+        </ul>
+      </details>
+      <button class="run">Run check</button>
+      <ul class="results"></ul>
+    </div>
+  </article>
+
+  <!-- ───── STEP 4 ───── -->
+  <article class="quest" data-step="4">
+    <button class="q-head"><span class="q-icon">4</span><span class="q-title"><b>Bag and buy</b><span>Relations · foreign keys · JOIN</span></span><span class="q-chev">▶</span></button>
+    <div class="q-body">
+      <p><b>Goal:</b> show the items a player owns and let the player buy more.</p>
+      <p class="files">✏️ Files: <code>src/entities/inventory-item.entity.ts</code>, a new migration, <code>src/game.module.ts</code>, <code>src/game.service.ts</code>, <code>src/game.controller.ts</code></p>
+      <div class="learn">One player owns many items; one item is owned by many players. The link table sits in the middle:<br>
+        <code>Player</code> 1 ── * <code>InventoryItem</code> * ── 1 <code>Item</code><br>
+        <b>No transaction is required for this homework.</b> Just do the checks before you save.</div>
+
+      <h4>Expected result</h4>
+      <div class="api">GET /players/:id/inventory
+→ 200 [ { "item": Item, "quantity": 2 }, ... ]   ([] for a new hero)
+→ 404 if the player does not exist
+
+POST /players/:id/buy   body { "itemId": 1 }
+→ 201 { "item": Item, "player": Player }
+→ 400 not enough gold (and NOTHING changes)
+→ 400 itemId is not a number
+→ 404 player or item not found
+
+Attack = 1 + sum(item.attack × quantity). Damage in attack() uses it too.</div>
+
+      <h4>Hints</h4>
+      <ul>
+        <li><b>InventoryItem:</b> <code>playerId</code>, <code>itemId</code>, <code>quantity</code> (default 1), and a <code>@ManyToOne(() => Item)</code> + <code>@JoinColumn({ name: 'itemId' })</code> relation. Add <code>@Unique(['playerId', 'itemId'])</code>.</li>
+        <li>Generate and run a <code>CreateInventory</code> migration.</li>
+        <li><b>Bag:</b> <code>find({ where: { playerId: id }, relations: { item: true } })</code> then map to <code>{ item, quantity }</code>.</li>
+        <li><b>Buy:</b> find player → find item → check gold → save player → find the link row → increment <code>quantity</code> or create it.</li>
+        <li>For <code>itemId</code> use <code>@Body('itemId', ParseIntPipe)</code>; no extra DTO file.</li>
+        <li>Add <code>InventoryItem</code> to <code>TypeOrmModule.forFeature([...])</code>.</li>
+      </ul>
+
+      <details class="hint-box"><summary>💡 Stuck?</summary>
+        <ul>
+          <li>The check kills 3 monsters (5 + 7 + 9 = 21 gold), buys a Wooden Dagger (15), and expects 6 gold and attack 2.</li>
+          <li>A failed buy changed something? Check the gold <b>before</b> writing.</li>
+        </ul>
+      </details>
+      <button class="run">Run check</button>
+      <ul class="results"></ul>
+    </div>
+  </article>
+
+  <!-- ───── STEP 5 ───── -->
+  <article class="quest" data-step="5">
+    <button class="q-head"><span class="q-icon">5</span><span class="q-title"><b>Leaderboard</b><span>N+1 problem</span></span><span class="q-chev">▶</span></button>
+    <div class="q-body">
+      <p><b>Goal:</b> show the top heroes by XP, fast.</p>
+      <p class="files">✏️ Files: <code>src/game.service.ts</code>, <code>src/game.controller.ts</code></p>
+      <div class="learn"><b>N+1:</b> 1 query for the page + 1 query per hero. 10 heroes = 11 queries. Fix it with <b>one</b> extra query for all attacks.</div>
+
+      <h4>Expected result</h4>
+      <div class="api">GET /leaderboard?page=1&limit=5
+→ 200 { "data": [5 rows], "page": 1, "limit": 5, "total": ... }
+
+Row = { "rank": 1, "id": 7, "name": "Aria", "level": 3,
+        "xp": 250, "gold": 40, "attack": 4 }
+
+Sort: xp DESC, then id ASC.   rank = skip + index + 1
+limit above 20 → 400 (or capped at 20)</div>
+
+      <h4>Hints</h4>
+      <ul>
+        <li>First write the <b>slow</b> version: after loading the page, call <code>attackOf(p.id)</code> inside a loop.</li>
+        <li>Then fix it: collect <code>ids</code>, run <code>inventory.find({ where: { playerId: In(ids) }, relations: { item: true } })</code> once, and sum per player in a <code>Map</code>.</li>
+        <li>Reuse <code>PageQueryDto</code> for <code>page</code> and <code>limit</code>.</li>
+        <li>Optional: add <code>@Index()</code> on <code>xp</code> to make sorting faster.</li>
+      </ul>
+
+      <details class="hint-box"><summary>💡 Stuck?</summary>
+        <ul>
+          <li>Page 2 must start at rank 11.</li>
+          <li>Compare 3 leaderboard rows with <code>GET /players/:id</code>: level and attack must match.</li>
+        </ul>
+      </details>
+      <button class="run">Run check</button>
+      <ul class="results"></ul>
+    </div>
+  </article>
+  </div>
+</div>
+
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════
+   PART 1: THE GAME
+   ════════════════════════════════════════════════════════════════ */
+const API = ''; // same server
+const SHOP_LIMIT = 4, BOARD_LIMIT = 5;
+const $ = (id) => document.getElementById(id);
+let player = null, shopPage = 1, boardPage = 1;
+
+const store = {
+  get(key, fallback) { try { const v = localStorage.getItem('dc.' + key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
+  set(key, value) { try { value === null ? localStorage.removeItem('dc.' + key) : localStorage.setItem('dc.' + key, JSON.stringify(value)); } catch {} },
+};
+
+async function api(path, options = {}) {
+  const res = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...options });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(Array.isArray(body.message) ? body.message.join(', ') : body.message || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return body;
+}
+const lock = (panel, on) => $(panel).classList.toggle('locked', on);
+// NestJS answers "Cannot GET /items" when a route does not exist yet
+const isMissingRoute = (err) => err.status === 404 && /^Cannot /.test(err.message);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function toast(msg, bad = false) {
+  const t = $('toast'); t.textContent = msg; t.className = 'toast show' + (bad ? ' bad' : '');
+  clearTimeout(t.timer); t.timer = setTimeout(() => (t.className = 'toast'), 2400);
+}
+function floatText(text, x, y, cls = '') {
+  const el = document.createElement('span');
+  el.className = 'float ' + cls; el.textContent = text;
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+  document.body.appendChild(el); setTimeout(() => el.remove(), 800);
+}
+
+function showStart() { $('startScreen').hidden = false; $('gameScreen').hidden = true; }
+function showGame() { $('startScreen').hidden = true; $('gameScreen').hidden = false; }
+
+$('startForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('startError').textContent = '';
+  try {
+    player = await api('/players', { method: 'POST', body: JSON.stringify({ name: $('heroName').value }) });
+    store.set('playerId', player.id);
+    startGame();
+  } catch (err) {
+    $('startError').textContent = isMissingRoute(err) || err.status === undefined
+      ? '🔒 Creating heroes is locked. Finish Step 2 in the Quest Log →'
+      : err.message;
+  }
+});
+$('newHero').addEventListener('click', () => { store.set('playerId', null); player = null; showStart(); });
+
+function renderPlayer() {
+  $('heroTitle').textContent = player.name;
+  $('statLevel').textContent = player.level ?? 1;
+  $('statGold').textContent = player.gold ?? 0;
+  $('statAttack').textContent = player.attack ?? 1;
+  const xp = Number(player.xp) || 0, inLevel = xp % 100;
+  $('xpFill').style.width = inLevel + '%';
+  $('xpLabel').textContent = `XP ${inLevel} / 100`;
+  renderMonster(player.monster);
+  refreshBuyButtons();
+}
+
+function renderMonster(m) {
+  if (!m) { lock('arenaPanel', true); return; }
+  $('monsterName').textContent = m.name;
+  $('monster').textContent = m.icon;
+  $('hpFill').style.width = Math.round((m.hp / m.maxHp) * 100) + '%';
+  $('hpText').textContent = `${m.hp} / ${m.maxHp} HP`;
+}
+
+$('monster').addEventListener('click', async (e) => {
+  const box = $('monster').getBoundingClientRect();
+  const x = e.clientX || box.left + 120, y = e.clientY || box.top + 60;
+  try {
+    const r = await api(`/players/${player.id}/attack`, { method: 'POST' });
+    lock('arenaPanel', false);
+    floatText('-' + r.damage, x, y);
+    const m = $('monster');
+    m.classList.remove('hit', 'spawn'); void m.offsetWidth;
+    m.classList.add(r.defeated ? 'spawn' : 'hit');
+    if (r.defeated) {
+      floatText(`+${r.reward.gold} gold`, x, y - 30, 'reward');
+      toast(`${$('monsterName').textContent} defeated! +${r.reward.gold} gold`);
+      loadBoard();
+    }
+    player = r.player; renderPlayer();
+  } catch (err) {
+    if (isMissingRoute(err)) lock('arenaPanel', true);
+    else toast(err.message, true);
+  }
+});
+
+let shopItems = [];
+async function loadShop() {
+  try {
+    const res = await api(`/items?page=${shopPage}&limit=${SHOP_LIMIT}`);
+    if (!Array.isArray(res.data)) throw new Error('Expected { data: [...] }');
+    lock('shopPanel', false);
+    shopItems = res.data;
+    const pages = Math.max(1, Math.ceil(res.total / res.limit));
+    $('shopPage').textContent = `Page ${res.page} of ${pages}`;
+    $('shopPrev').disabled = res.page <= 1; $('shopNext').disabled = res.page >= pages;
+    $('items').innerHTML = shopItems.map((it) => `
+      <div class="item">
+        <div class="item-top"><span class="item-icon">${esc(it.icon)}</span>
+          <div><div class="item-name">${esc(it.name)}</div><div class="item-atk">+${esc(it.attack)} attack</div></div></div>
+        <button class="buy" data-id="${esc(it.id)}" data-price="${esc(it.price)}">Buy for ${esc(it.price)} gold</button>
+      </div>`).join('');
+    refreshBuyButtons();
+  } catch { lock('shopPanel', true); }
+}
+function refreshBuyButtons() {
+  document.querySelectorAll('.buy').forEach((b) => (b.disabled = !player || player.gold < Number(b.dataset.price)));
+}
+$('shopPrev').addEventListener('click', () => { shopPage--; loadShop(); });
+$('shopNext').addEventListener('click', () => { shopPage++; loadShop(); });
+$('items').addEventListener('click', async (e) => {
+  const btn = e.target.closest('.buy'); if (!btn) return;
+  try {
+    const r = await api(`/players/${player.id}/buy`, { method: 'POST', body: JSON.stringify({ itemId: Number(btn.dataset.id) }) });
+    player = r.player; renderPlayer();
+    toast(`Bought ${r.item.name}`);
+    loadBag();
+  } catch (err) {
+    toast(isMissingRoute(err) ? '🔒 Buying is locked. Finish Step 4 in the Quest Log' : err.message, true);
+  }
+});
+
+async function loadBag() {
+  try {
+    const rows = await api(`/players/${player.id}/inventory`);
+    if (!Array.isArray(rows)) throw new Error('Expected an array');
+    lock('bagPanel', false);
+    $('bag').innerHTML = rows.length
+      ? rows.map((r) => `<div class="slot">${esc(r.item.icon)} ${esc(r.item.name)} <b>×${esc(r.quantity)}</b></div>`).join('')
+      : '<p class="empty">Your bag is empty. Earn gold and buy your first weapon.</p>';
+  } catch { lock('bagPanel', true); }
+}
+
+async function loadBoard() {
+  try {
+    const res = await api(`/leaderboard?page=${boardPage}&limit=${BOARD_LIMIT}`);
+    if (!Array.isArray(res.data)) throw new Error('Expected { data: [...] }');
+    lock('boardPanel', false);
+    const pages = Math.max(1, Math.ceil(res.total / res.limit));
+    $('boardPage').textContent = `Page ${res.page} of ${pages}`;
+    $('boardPrev').disabled = res.page <= 1; $('boardNext').disabled = res.page >= pages;
+    $('boardRows').innerHTML = res.data.map((p) => `
+      <tr class="${player && p.id === player.id ? 'me' : ''}">
+        <td class="rank">#${esc(p.rank)}</td><td>${esc(p.name)}</td><td>${esc(p.level)}</td><td>${esc(p.xp)}</td><td>${esc(p.attack ?? '-')}</td><td>${esc(p.gold)}</td>
+      </tr>`).join('');
+  } catch { lock('boardPanel', true); }
+}
+$('boardPrev').addEventListener('click', () => { boardPage--; loadBoard(); });
+$('boardNext').addEventListener('click', () => { boardPage++; loadBoard(); });
+
+document.addEventListener('click', (e) => {
+  const r = e.target.dataset && e.target.dataset.retry;
+  if (r === 'arena') refreshPlayer();
+  if (r === 'shop') loadShop();
+  if (r === 'bag') loadBag();
+  if (r === 'board') loadBoard();
+});
+
+async function refreshPlayer() {
+  if (!player) return;
+  try {
+    player = await api(`/players/${player.id}`);
+    lock('arenaPanel', !player.monster);
+    renderPlayer();
+  } catch (err) { toast(err.message, true); }
+}
+
+function startGame() {
+  showGame(); renderPlayer();
+  lock('arenaPanel', !player.monster);
+  loadShop(); loadBag(); loadBoard();
+}
+
+async function bootGame() {
+  const id = store.get('playerId', null);
+  if (!id) return showStart();
+  try { player = await api(`/players/${id}`); startGame(); }
+  catch { store.set('playerId', null); showStart(); }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PART 2: THE QUEST LOG CHECKS
+   Each check calls your API like a real client and compares the answer.
+   ════════════════════════════════════════════════════════════════ */
+
+// Turn every <script type="text/plain" class="code"> into a code box with a Copy button
+document.querySelectorAll('script.code').forEach((s) => {
+  const box = document.createElement('div');
+  box.className = 'snippet';
+  const code = s.textContent.replace(/^\n/, '');
+  box.innerHTML = `<span class="file">${esc(s.dataset.file || 'code')}</span><pre></pre><button class="copy" type="button">Copy</button>`;
+  box.querySelector('pre').textContent = code;
+  box.querySelector('.copy').addEventListener('click', async (e) => {
+    try { await navigator.clipboard.writeText(code); e.target.textContent = 'Copied'; }
+    catch { e.target.textContent = 'Select + Ctrl+C'; }
+    setTimeout(() => (e.target.textContent = 'Copy'), 1500);
+  });
+  s.replaceWith(box);
+});
+
+// ── Small helpers for the checks ──
+class CheckFail extends Error {
+  constructor(message, details = {}) { super(message); Object.assign(this, details); }
+}
+
+async function call(method, path, body) {
+  const options = { method, headers: {} };
+  if (body !== undefined) { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body); }
+  let res;
+  try { res = await fetch(API + path, options); }
+  catch { throw new CheckFail('Cannot reach the server.', { tip: 'Is <code>npm run start:dev</code> running? Did it crash? Look at the terminal.' }); }
+  const raw = await res.text();
+  let json; try { json = JSON.parse(raw); } catch { json = undefined; }
+  return { method, path, sent: body, status: res.status, body: json, raw };
+}
+
+function expectStatus(r, codes, what) {
+  if (codes.includes(r.status)) return;
+  const msg = r.body && r.body.message;
+  if (r.status === 404 && typeof msg === 'string' && /^Cannot /.test(msg)) {
+    throw new CheckFail(`The route ${r.method} ${r.path.split('?')[0]} does not exist yet.`, {
+      r, tip: 'Check the @Controller path and the @Get/@Post decorator. Is the module imported in AppModule? Is the controller in the module?',
+    });
+  }
+  if (r.status >= 500) {
+    throw new CheckFail(`Server error ${r.status}.`, { r, tip: 'Look at the terminal where NestJS is running. The real error is printed there.' });
+  }
+  throw new CheckFail(`Expected status ${codes.join(' or ')} (${what}), but got ${r.status}.`, { r });
+}
+
+function expect(ok, message, r, tip) {
+  if (!ok) throw new CheckFail(message, { r, tip });
+}
+
+// Shape checker: 'int' | 'string' | 'bool' | { key: shape } | ['array', shape] | ['nullable', shape]
+function shapeProblem(value, shape, path) {
+  if (Array.isArray(shape) && shape[0] === 'nullable') return value === null ? null : shapeProblem(value, shape[1], path);
+  if (Array.isArray(shape) && shape[0] === 'array') {
+    if (!Array.isArray(value)) return { msg: `<code>${path}</code> should be an array, but got ${typeName(value)}.` };
+    for (let i = 0; i < value.length; i++) { const p = shapeProblem(value[i], shape[1], `${path}[${i}]`); if (p) return p; }
+    return null;
+  }
+  if (shape === 'int') {
+    if (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value)) {
+      return { msg: `<code>${path}</code> should be a number, but got the string "${esc(value)}".`,
+        tip: 'PostgreSQL <code>bigint</code>, <code>numeric</code> and <code>SUM()</code> results come back as strings. Use <code>int</code> columns, or convert with <code>Number(...)</code>.' };
+    }
+    if (!Number.isInteger(value)) return { msg: `<code>${path}</code> should be a whole number, but got ${typeName(value)}.` };
+    return null;
+  }
+  if (shape === 'string') return typeof value === 'string' ? null : { msg: `<code>${path}</code> should be text, but got ${typeName(value)}.` };
+  if (shape === 'bool') return typeof value === 'boolean' ? null : { msg: `<code>${path}</code> should be true or false, but got ${typeName(value)}.` };
+  if (typeof shape === 'object') {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return { msg: `<code>${path}</code> should be an object, but got ${typeName(value)}.` };
+    for (const key of Object.keys(shape)) {
+      if (!(key in value)) return { msg: `<code>${path}.${key}</code> is missing.` };
+      const p = shapeProblem(value[key], shape[key], `${path}.${key}`); if (p) return p;
+    }
+    return null;
+  }
+  return null;
+}
+const typeName = (v) => v === null ? 'null' : v === undefined ? 'nothing' : Array.isArray(v) ? 'an array' : typeof v === 'string' ? `"${esc(v)}"` : `${typeof v} ${esc(JSON.stringify(v))}`;
+
+function expectShape(value, shape, path, r) {
+  const p = shapeProblem(value, shape, path);
+  if (p) throw new CheckFail(p.msg, { r, tip: p.tip, html: true });
+}
+
+const ITEM = { id: 'int', name: 'string', icon: 'string', attack: 'int', price: 'int' };
+const MONSTER = { name: 'string', icon: 'string', hp: 'int', maxHp: 'int' };
+const PLAYER = { id: 'int', name: 'string', level: 'int', xp: 'int', gold: 'int', attack: 'int', kills: 'int', monster: MONSTER };
+
+const testName = () => 'Tester-' + Math.floor(1000 + Math.random() * 9000);
+
+async function newTester() {
+  const r = await call('POST', '/players', { name: testName() });
+  expectStatus(r, [201], 'create a player');
+  expectShape(r.body, PLAYER, 'player', r);
+  return r.body;
+}
+
+// Attack until the player has `kills` kills. Returns the last player.
+async function attackUntil(id, kills) {
+  for (let i = 0; i < 300; i++) {
+    const r = await call('POST', `/players/${id}/attack`);
+    expectStatus(r, [200, 201], 'attack');
+    if (r.body.player.kills >= kills) return r.body.player;
+  }
+  throw new CheckFail(`After 300 attacks the player still has fewer than ${kills} kills.`, { tip: 'Does the monster HP go down and does kills go up when HP reaches 0?' });
+}
+
+// ── The checks for each step ──
+// t.pass(label) adds a green line. Throwing CheckFail adds a red line and stops.
+const CHECKS = [
+  // STEP 0: health
+  async (t) => {
+    const r = await call('GET', '/health');
+    expectStatus(r, [200], 'health check');
+    expect(r.body && r.body.db === 'up', 'Expected { "db": "up" }.', r);
+    t.pass('GET /health says the database is up');
+  },
+
+  // STEP 1: items + pagination
+  async (t) => {
+    let r = await call('GET', '/items?page=1&limit=4');
+    expectStatus(r, [200], 'list items');
+    expectShape(r.body, { data: ['array', ITEM], page: 'int', limit: 'int', total: 'int' }, 'response', r);
+    const first = r.body;
+    expect(first.total === 8, `total should be 8 (all items), but it is ${first.total}.`, r, 'Did the migration insert the 8 items? <code>total</code> is the count of ALL rows, not just this page.');
+    expect(first.data.length === 4 && first.page === 1 && first.limit === 4, 'Page 1 with limit 4 should return 4 items, page 1, limit 4.', r);
+    expect(first.data[0].name === 'Wooden Dagger' && first.data[0].price === 15, 'The first item should be the Wooden Dagger (price 15).', r, 'Sort by id: <code>order: { id: "ASC" }</code>.');
+    t.pass('Page 1 returns 4 items and total = 8');
+
+    r = await call('GET', '/items?page=2&limit=4');
+    expectStatus(r, [200], 'list items page 2');
+    const ids1 = first.data.map((i) => i.id), ids2 = (r.body.data || []).map((i) => i.id);
+    expect(ids2.length === 4 && ids2.every((id) => !ids1.includes(id)), 'Page 2 should have 4 different items.', r, 'skip = (page − 1) × limit');
+    expect(r.body.data[0].name === 'War Hammer', 'Page 2 should start with the War Hammer.', r);
+    t.pass('Page 2 returns the next 4 items');
+
+    r = await call('GET', '/items');
+    expectStatus(r, [200], 'list items without page/limit');
+    expect(r.body.page === 1 && r.body.limit === 10 && r.body.data.length === 8, 'Without query values: page 1, limit 10 (so all 8 items).', r);
+    t.pass('Defaults work: page 1, limit 10');
+
+    r = await call('GET', '/items?page=1&limit=1000');
+    expect(r.status === 400 || (r.status === 200 && r.body.limit <= 20), 'limit=1000 should be rejected (400) or capped at 20.', r, 'Never let a client ask for the whole table. Use <code>@Max(20)</code>.');
+    t.pass('A huge limit is blocked');
+  },
+
+  // STEP 2: create hero
+  async (t) => {
+    const name = testName();
+    let r = await call('POST', '/players', { name });
+    expectStatus(r, [201], 'create a hero');
+    expectShape(r.body, PLAYER, 'player', r);
+    const p = r.body;
+    expect(p.name === name, `Expected name "${name}".`, r);
+    expect(p.gold === 0 && p.xp === 0 && p.kills === 0 && p.level === 1 && p.attack === 1,
+      'A new hero should start with gold 0, xp 0, kills 0, level 1, attack 1.', r);
+    expect(p.monster.name === 'Slime' && p.monster.hp === 8 && p.monster.maxHp === 8,
+      'A new hero should face a Slime with 8 / 8 HP.', r, 'monsterHp is null for a new hero, so hp = maxHp = 8 + kills × 4.');
+    t.pass('POST /players creates a hero with the right shape');
+
+    r = await call('GET', `/players/${p.id}`);
+    expectStatus(r, [200], 'read the hero');
+    expectShape(r.body, PLAYER, 'player', r);
+    expect(r.body.id === p.id && r.body.name === name, 'GET returned a different hero.', r);
+    t.pass('GET /players/:id reads the hero back from the database');
+
+    r = await call('POST', '/players', { name: 'a' });
+    expectStatus(r, [400], 'name too short');
+    r = await call('POST', '/players', { name: 'x'.repeat(21) });
+    expectStatus(r, [400], 'name too long');
+    r = await call('POST', '/players', {});
+    expectStatus(r, [400], 'name missing');
+    t.pass('Bad names are rejected with 400');
+
+    r = await call('GET', '/players/999999');
+    expectStatus(r, [404], 'unknown player');
+    t.pass('Unknown player returns 404');
+
+    r = await call('GET', '/players/abc');
+    expectStatus(r, [400], 'id is not a number');
+    t.pass('/players/abc returns 400 (ParseIntPipe)');
+  },
+
+  // STEP 3: fight
+  async (t) => {
+    const p = await newTester();
+
+    let r = await call('POST', `/players/${p.id}/attack`, { gold: 9999, damage: 999, xp: 9999 });
+    expectStatus(r, [200, 201], 'attack');
+    expectShape(r.body, { damage: 'int', defeated: 'bool', reward: ['nullable', { gold: 'int', xp: 'int' }], player: PLAYER }, 'response', r);
+    expect(r.body.damage === 1, `First hit should do 1 damage, but damage = ${r.body.damage}.`, r, 'A new hero has bare hands: attack 1. Ignore anything the client sends.');
+    expect(r.body.player.gold === 0, 'Gold changed after one hit. Did you use values from the request body?', r, 'The server decides the reward. Never read gold or damage from the client.');
+    expect(r.body.player.monster.hp === 7, `Slime HP should be 7 after one hit, but it is ${r.body.player.monster.hp}.`, r);
+    expect(r.body.defeated === false && r.body.reward === null, 'The Slime should not be dead after one hit.', r);
+    t.pass('One hit does 1 damage and ignores the fake body');
+
+    for (let i = 0; i < 6; i++) { r = await call('POST', `/players/${p.id}/attack`); expectStatus(r, [200, 201], 'attack'); }
+    r = await call('POST', `/players/${p.id}/attack`);
+    expectStatus(r, [200, 201], 'attack');
+    const b = r.body;
+    expect(b.defeated === true, 'The 8th hit should kill the Slime (8 HP).', r);
+    expect(b.reward && b.reward.gold === 5 && b.reward.xp === 25, 'Reward for the first kill should be { gold: 5, xp: 25 }.', r);
+    expect(b.player.gold === 5 && b.player.xp === 25 && b.player.kills === 1, 'After the first kill: gold 5, xp 25, kills 1.', r);
+    expect(b.player.monster.name === 'Goblin' && b.player.monster.hp === 12 && b.player.monster.maxHp === 12,
+      'After the first kill a new Goblin with 12 / 12 HP should appear.', r, 'Set monsterHp = null after a kill.');
+    t.pass('The 8th hit kills the Slime and gives the right reward');
+
+    r = await call('GET', `/players/${p.id}`);
+    expectStatus(r, [200], 'read the hero');
+    expect(r.body.gold === 5 && r.body.kills === 1, 'GET /players/:id does not show the new gold. Was it saved?', r, 'Call <code>save()</code> after you change the player.');
+    t.pass('The new gold is saved in the database');
+
+    r = await call('POST', '/players/999999/attack');
+    expectStatus(r, [404], 'unknown player');
+    t.pass('Attacking with an unknown player returns 404');
+  },
+
+  // STEP 4: bag + buy
+  async (t) => {
+    const p = await newTester();
+    let r = await call('GET', `/players/${p.id}/inventory`);
+    expectStatus(r, [200], 'read the bag');
+    expect(Array.isArray(r.body) && r.body.length === 0, 'A new hero should have an empty bag: [].', r);
+    t.pass('A new hero has an empty bag []');
+
+    r = await call('GET', '/players/999999/inventory');
+    expectStatus(r, [404], 'unknown player');
+    t.pass('Unknown player returns 404');
+
+    r = await call('POST', `/players/${p.id}/buy`, { itemId: 1 });
+    expectStatus(r, [400], 'not enough gold');
+    r = await call('GET', `/players/${p.id}`);
+    expect(r.body.gold === 0, 'A failed buy changed the gold!', r);
+    r = await call('GET', `/players/${p.id}/inventory`);
+    expect(Array.isArray(r.body) && r.body.length === 0, 'A failed buy added an item to the bag!', r, 'Check the gold BEFORE you change anything.');
+    t.pass('Not enough gold → 400, and nothing changed');
+
+    r = await call('POST', `/players/${p.id}/buy`, { itemId: 999999 });
+    expectStatus(r, [404], 'unknown item');
+    r = await call('POST', `/players/${p.id}/buy`, { itemId: 'abc' });
+    expectStatus(r, [400], 'itemId is not a number');
+    r = await call('POST', '/players/999999/buy', { itemId: 1 });
+    expectStatus(r, [404], 'unknown player');
+    t.pass('Bad item / bad player are rejected');
+
+    const rich = await attackUntil(p.id, 3);
+    expect(rich.gold === 21, `After 3 kills the hero should have 21 gold, but has ${rich.gold}.`);
+    r = await call('POST', `/players/${p.id}/buy`, { itemId: 1 });
+    expectStatus(r, [201, 200], 'buy the Wooden Dagger');
+    expectShape(r.body, { item: ITEM, player: PLAYER }, 'response', r);
+    expect(r.body.player.gold === 6, `After buying the dagger (15) gold should be 6, but it is ${r.body.player.gold}.`, r);
+    expect(r.body.player.attack === 2, `With a dagger (+1) attack should be 2, but it is ${r.body.player.attack}.`, r, 'attack = 1 + sum(item.attack × quantity)');
+    t.pass('Buying takes the gold and makes the hero stronger');
+
+    r = await call('GET', `/players/${p.id}/inventory`);
+    expectStatus(r, [200], 'read the bag');
+    expectShape(r.body, ['array', { item: ITEM, quantity: 'int' }], 'bag', r);
+    expect(r.body.length === 1 && r.body[0].item.id === 1 && r.body[0].quantity === 1, 'The bag should have 1 × Wooden Dagger.', r);
+    t.pass('The bag shows [{ item, quantity }] with the item joined in');
+
+    r = await call('POST', `/players/${p.id}/attack`);
+    expect(r.body && r.body.damage === 2, 'Attack damage should now be 2.', r, 'Use attackOf(player) as the damage in attack().');
+    t.pass('Damage uses the weapon');
+  },
+
+  // STEP 5: leaderboard
+  async (t) => {
+    let r = await call('GET', '/leaderboard?page=1&limit=10');
+    expectStatus(r, [200], 'leaderboard');
+    expectShape(r.body, { data: ['array', { rank: 'int', id: 'int', name: 'string', level: 'int', xp: 'int', gold: 'int', attack: 'int' }], page: 'int', limit: 'int', total: 'int' }, 'response', r);
+    for (let n = r.body.total; n < 12; n++) await newTester();
+    const top = await newTester();
+    await attackUntil(top.id, 1);
+
+    r = await call('GET', '/leaderboard?page=1&limit=10');
+    expectStatus(r, [200], 'leaderboard');
+    const page1 = r.body;
+    expect(page1.total >= 12 && page1.data.length === 10 && page1.page === 1 && page1.limit === 10, 'Page 1 with limit 10 should return 10 rows and the total number of heroes.', r);
+    for (let i = 1; i < page1.data.length; i++) {
+      expect(page1.data[i - 1].xp >= page1.data[i].xp, 'Rows are not sorted by xp (highest first).', r, "order: { xp: 'DESC', id: 'ASC' }");
+    }
+    expect(page1.data.every((row, i) => row.rank === i + 1), 'Ranks on page 1 should be 1, 2, 3, ...', r);
+    t.pass('Sorted by xp, ranks are right, total counts every hero');
+
+    r = await call('GET', '/leaderboard?page=2&limit=10');
+    expectStatus(r, [200], 'leaderboard page 2');
+    expect(r.body.data.length > 0 && r.body.data[0].rank === 11, 'Page 2 should start at rank 11.', r, 'rank = skip + index + 1');
+    t.pass('Page 2 starts at rank 11');
+
+    for (const row of page1.data.slice(0, 3)) {
+      const pr = await call('GET', `/players/${row.id}`);
+      expect(pr.body && pr.body.attack === row.attack && pr.body.level === row.level, `Row for "${row.name}" has attack ${row.attack}, level ${row.level}, but GET /players/${row.id} says attack ${pr.body && pr.body.attack}, level ${pr.body && pr.body.level}.`, pr);
+    }
+    t.pass('attack and level match each hero');
+
+    r = await call('GET', '/leaderboard?page=1&limit=1000');
+    expect(r.status === 400 || (r.status === 200 && r.body.limit <= 20), 'limit=1000 should be rejected (400) or capped at 20.', r);
+    t.pass('A huge limit is blocked');
+  },
+];
+
+
+const STEP_COUNT = CHECKS.length;
+const quests = [...document.querySelectorAll('.quest')];
+let passed = store.get('passed', {});
+
+function isDone(i) { return !!passed[i]; }
+function currentStep() { for (let i = 0; i < STEP_COUNT; i++) if (!isDone(i)) return i; return STEP_COUNT; }
+
+function stepTitle(i) {
+  const b = quests[i] && quests[i].querySelector('.q-title b');
+  return b ? b.textContent : '';
+}
+
+function renderQuestLog() {
+  const cur = currentStep();
+  const done = quests.filter((_, i) => isDone(i)).length;
+  $('qlCount').textContent = `${done} / ${STEP_COUNT} finished`;
+  $('qlFabCount').textContent = `${done} / ${STEP_COUNT} finished`;
+  $('qlBar').style.width = (done / STEP_COUNT) * 100 + '%';
+  const next = cur < STEP_COUNT ? `Step ${cur} of ${STEP_COUNT} — ${stepTitle(cur)}` : 'all quests finished 🏆';
+  $('qlNext').textContent = `Recommended: ${next}`;
+  $('qlFabNext').textContent = cur < STEP_COUNT ? `Next: ${next}` : 'All done 🏆';
+  quests.forEach((q, i) => {
+    q.classList.toggle('passed', isDone(i));
+    q.classList.toggle('current', i === cur);
+    q.classList.toggle('later', i > cur);
+    q.querySelector('.q-icon').textContent = isDone(i) ? '✓' : i;
+  });
+}
+
+function openQuest(i, scroll) {
+  const q = quests[i]; if (!q) return;
+  q.classList.add('open');
+  if (scroll) q.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function addResult(list, cls, html, err) {
+  const li = document.createElement('li');
+  li.className = cls;
+  li.innerHTML = html;
+  if (err) {
+    const box = document.createElement('div');
+    box.className = 'fail-box';
+    let inner = '';
+    if (err.r) {
+      inner += `<div><b>Request:</b> <code>${esc(err.r.method)} ${esc(err.r.path)}</code>${err.r.sent !== undefined ? ` body <code>${esc(JSON.stringify(err.r.sent))}</code>` : ''}</div>`;
+      inner += `<div><b>Got:</b> status ${esc(err.r.status)}</div><pre>${esc((err.r.raw || '').slice(0, 600))}</pre>`;
+    }
+    if (err.tip) inner += `<div class="tip">💡 ${err.tip}</div>`;
+    box.innerHTML = inner;
+    if (inner) li.appendChild(box);
+  }
+  list.appendChild(li);
+}
+
+async function runStep(i) {
+  const q = quests[i];
+  const btn = q.querySelector('.run'), list = q.querySelector('.results');
+  btn.disabled = true; btn.textContent = 'Checking…';
+  list.innerHTML = '';
+  const t = {
+    pass: (label) => addResult(list, 'ok', esc(label)),
+    star: (label) => addResult(list, 'star', label),
+    info: (label) => addResult(list, 'info', label),
+  };
+  let ok = false;
+  try {
+    await CHECKS[i](t);
+    ok = true;
+  } catch (err) {
+    if (err instanceof CheckFail) addResult(list, 'bad', err.message, err);
+    else addResult(list, 'bad', 'Unexpected answer: ' + esc(err.message), { tip: 'The response did not have the expected shape. Compare it with the Endpoint box above.' });
+  }
+  passed[i] = ok;
+  store.set('passed', passed);
+  if (isDone(i)) {
+    const banner = document.createElement('li');
+    banner.innerHTML = `<div class="done-banner">Step ${i} complete! ${i + 1 < STEP_COUNT ? 'On to Step ' + (i + 1) + ' ↓' : 'You finished every quest. 🏆'}</div>`;
+    list.appendChild(banner);
+  }
+  btn.disabled = false; btn.textContent = 'Run check';
+  renderQuestLog();
+  refreshGame();
+  return isDone(i);
+}
+
+function refreshGame() {
+  if (player && !$('gameScreen').hidden) { refreshPlayer(); loadShop(); loadBag(); loadBoard(); }
+  else if (!player) bootGame();
+}
+
+// Run the current step, and keep going while steps pass
+async function runFrom(start) {
+  for (let i = start; i < STEP_COUNT; i++) {
+    openQuest(i);
+    const done = await runStep(i);
+    if (!done) { openQuest(i, true); return; }
+    quests[i].classList.remove('open');
+  }
+}
+
+quests.forEach((q, i) => {
+  q.querySelector('.q-head').addEventListener('click', () => q.classList.toggle('open'));
+  q.querySelector('.run').addEventListener('click', async () => {
+    const done = await runStep(i);
+    if (done && i + 1 < STEP_COUNT) { openQuest(i + 1, true); }
+  });
+});
+$('recheckAll').addEventListener('click', () => { passed = {}; store.set('passed', passed); renderQuestLog(); runFrom(0); });
+$('expandAll').addEventListener('click', () => quests.forEach((q) => q.classList.add('open')));
+
+const questModal = $('questModal');
+function openQuestModal() { questModal.hidden = false; document.body.style.overflow = 'hidden'; }
+function closeQuestModal() { questModal.hidden = true; document.body.style.overflow = ''; }
+$('openQuest').addEventListener('click', openQuestModal);
+$('closeQuest').addEventListener('click', closeQuestModal);
+questModal.addEventListener('click', (e) => { if (e.target.hasAttribute('data-close-quest')) closeQuestModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !questModal.hidden) closeQuestModal(); });
+
+renderQuestLog();
+bootGame();
+</script>
+</body>
+</html>
