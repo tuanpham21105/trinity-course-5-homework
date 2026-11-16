@@ -11,8 +11,8 @@ export class Item {
     name!: string;
     @Column()
     icon!: string;
-    @Column()
+    @Column({type: "int"})
     attack!: number;
-    @Column()
+    @Column({type: "int"})
     price!: number;
     }

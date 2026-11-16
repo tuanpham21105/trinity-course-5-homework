@@ -1,7 +1,9 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query } from '@nestjs/common';
 import { GameService } from './game.service';
 import { DataSource } from 'typeorm';
 import { PageQueryDto } from './common/dto/page-query.dto';
+import { Max, Min } from 'class-validator';
+import { CreatePlayerDto } from './common/dto/create-player.dto';
 
 @Controller()
 export class GameController {
@@ -16,9 +18,19 @@ export class GameController {
   // STEP 1: @Get('items')
   @Get('items')
   async findAll(@Query() query: PageQueryDto) {
-    return this.game.items(query);
+    return await this.game.items(query);
   }
   // STEP 2: @Post('players'), @Get('players/:id')
+  @Post('players')
+  @HttpCode(HttpStatus.CREATED)
+  async createPlayer(@Body() createPlayerDto: CreatePlayerDto) 
+  {
+    return await this.game.createPlayer(createPlayerDto.name);  
+  }
+  @Get('players/:id')
+  async findPlayer(@Param('id', ParseIntPipe) id: number) {
+    return await this.game.findPlayer(id);
+  }
   // STEP 3: @Post('players/:id/attack')
   // STEP 4: @Get('players/:id/inventory'), @Post('players/:id/buy')
   // STEP 5: @Get('leaderboard')
