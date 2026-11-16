@@ -4,12 +4,12 @@ import { DataSource, Repository } from 'typeorm';
 import { Item } from './entities/item.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Player } from './entities/player.entity';
-import { ResponsePlayerDto } from './common/dto/response-player.dto';
-import { max } from 'class-validator';
+import { InventoryItem } from './entities/inventory-item.entity';
+import { InventoryItemDto } from './common/dto/inventory-item.dto';
 
 @Injectable()
 export class GameService {
-  constructor (@InjectRepository(Item) private readonly itemsRepo: Repository<Item>, @InjectRepository(Player) private readonly playersRepo: Repository<Player>) {}
+  constructor (@InjectRepository(Item) private readonly itemsRepo: Repository<Item>, @InjectRepository(Player) private readonly playersRepo: Repository<Player>, @InjectRepository(InventoryItem) private readonly inventoryItemsRepo: Repository<InventoryItem>) {}
 
   private readonly monsters = 
   [
@@ -32,23 +32,29 @@ export class GameService {
       maxHp: maxHp
     };
   }
-  private convertToResponsePlayer(player: Player) {
+  private async convertToResponsePlayer(player: Player) {
     return {
       id: player.id,
       name: player.name, 
       level: 1 + Math.floor(player.xp / 100), 
       xp: player.xp, 
       gold: player.gold,
-      attack: 1, 
+      attack: await this.attackOf(player.id), 
       kills: player.kills,
       monster: this.mapMonster(player.kills, player.monsterHp)
     };
   }
-  private async findOneById(id: number) {
+  private async findOnePlayerById(id: number) {
     const player = await this.playersRepo.findOneBy({id: id});
     if (!player)
       throw new NotFoundException();
     return player;
+  }
+  private async findOneItemById(id: number) {
+    const item = await this.itemsRepo.findOneBy({id: id});
+    if (!item)
+      throw new NotFoundException();
+    return item;
   }
 
   // STEP 1: items({ page, limit })
@@ -73,17 +79,17 @@ export class GameService {
         name: name
       }
     );
-    console.log(created);
-    return this.convertToResponsePlayer(await this.playersRepo.save(created));
+    return await this.convertToResponsePlayer(await this.playersRepo.save(created));
   }
   async findPlayer(id: number) {
-    const player = await this.findOneById(id);
-    return this.convertToResponsePlayer(player);
+    const player = await this.findOnePlayerById(id);
+    return await this.convertToResponsePlayer(player);
   }
   // STEP 3: attack(id)
   async attack(id: number) {
-    const player = await this.findOneById(id);
-    player.monsterHp = Math.max((player.monsterHp ?? this.monsterMaxHp(player.kills)) - 1, 0);
+    const player = await this.findOnePlayerById(id);
+    const damage = await this.attackOf(id);
+    player.monsterHp = Math.max((player.monsterHp ?? this.monsterMaxHp(player.kills)) - damage, 0);
     let isDefeated = false;
     const rewardGold = 5 + player.kills * 2;
     if (player.monsterHp === 0) {
@@ -95,12 +101,33 @@ export class GameService {
     }
     const updatedPlayer = await this.playersRepo.save(player);
     return {
-      damage: 1,
+      damage: damage,
       defeated: isDefeated,
       reward: !isDefeated ? null : {gold: rewardGold, xp: 25},
-      player: this.convertToResponsePlayer(updatedPlayer)
+      player: await this.convertToResponsePlayer(updatedPlayer)
     };
   }
   // STEP 4: inventory(id), buy(playerId, itemId), attackOf(playerId)
+  async inventory(id: number) {
+    const player = await this.findOnePlayerById(id);
+    return (await this.inventoryItemsRepo.find({where: {playerId: id}, relations: {item: true}})).map((value) => new InventoryItemDto(value.item, value.quantity));
+  }
+  async buy(playerId: number, itemId: number) {
+    const player = await this.findOnePlayerById(playerId);
+    const item = await this.findOneItemById(itemId);
+    if (player.gold < item.price) 
+      throw new BadRequestException();
+    const inventoryItem = await this.inventoryItemsRepo.findOneBy({playerId, itemId});
+    const newInventoryItem = this.inventoryItemsRepo.create({ id: inventoryItem?.id, playerId, itemId, quantity: inventoryItem ? inventoryItem.quantity + 1 : 1 });
+    await this.inventoryItemsRepo.save(newInventoryItem);
+    player.gold -= item.price;
+    await this.playersRepo.save(player);
+    return {item, player: await this.convertToResponsePlayer(player)};
+  }
+  async attackOf(playerId: number): Promise<number>
+  {
+    const damage = 1 + (await this.inventory(playerId)).reduce((p, c) => (p + c.item.attack * c.quantity), 0);
+    return damage;
+  }
   // STEP 5: leaderboard({ page, limit }) without the N+1 problem
 }

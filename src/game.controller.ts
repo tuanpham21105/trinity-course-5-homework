@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { PageQueryDto } from './common/dto/page-query.dto';
 import { Max, Min } from 'class-validator';
 import { CreatePlayerDto } from './common/dto/create-player.dto';
+import { BuyItemDto } from './common/dto/buy-item.dto';
 
 @Controller()
 export class GameController {
@@ -38,5 +39,13 @@ export class GameController {
     return await this.game.attack(id);
   }
   // STEP 4: @Get('players/:id/inventory'), @Post('players/:id/buy')
+  @Get('players/:id/inventory')
+  async findInventoryItems(@Param('id', ParseIntPipe) id: number) {
+    return await this.game.inventory(id);
+  }
+  @Post('players/:id/buy')
+  async buy(@Param('id', ParseIntPipe) id: number, @Body() body: BuyItemDto) {
+    return await this.game.buy(id, body.itemId);
+  }
   // STEP 5: @Get('leaderboard')
 }
