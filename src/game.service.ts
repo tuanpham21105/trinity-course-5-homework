@@ -6,6 +6,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Player } from './entities/player.entity';
 import { InventoryItem } from './entities/inventory-item.entity';
 import { InventoryItemDto } from './common/dto/inventory-item.dto';
+import { LeaderboardItem } from './common/dto/leaderboard-item.dto';
 
 @Injectable()
 export class GameService {
@@ -36,7 +37,7 @@ export class GameService {
     return {
       id: player.id,
       name: player.name, 
-      level: 1 + Math.floor(player.xp / 100), 
+      level: this.calcuLevel(player.xp), 
       xp: player.xp, 
       gold: player.gold,
       attack: await this.attackOf(player.id), 
@@ -55,6 +56,9 @@ export class GameService {
     if (!item)
       throw new NotFoundException();
     return item;
+  }
+  private calcuLevel(xp: number) {
+    return 1 + Math.floor(xp / 100);
   }
 
   // STEP 1: items({ page, limit })
@@ -130,4 +134,34 @@ export class GameService {
     return damage;
   }
   // STEP 5: leaderboard({ page, limit }) without the N+1 problem
+  async leaderboard(page: number, limit: number) {
+    const skipStep = (page - 1) * limit;
+    const [data, total] = await this.playersRepo.findAndCount(
+      {
+        relations: { inventoryItems: {item: true} },                                                                                                                            
+        order: { xp: 'DESC', id: 'ASC' },                                                                                                                                                             
+        skip: skipStep,                                                                                                                                                         
+        take: limit,                                                                                                                                                                      
+      }
+    );
+
+    const list = data.map((player, index) => new LeaderboardItem
+      (
+        skipStep + index + 1,
+        player.id,
+        player.name,
+        this.calcuLevel(player.xp),
+        player.xp,
+        player.gold,
+        1 + player.inventoryItems.reduce((p, c) => (p + c.item.attack * c.quantity), 0)
+      )
+    );
+    
+    return {
+      data: list,
+      page,
+      limit,
+      total
+    };
+  }
 }

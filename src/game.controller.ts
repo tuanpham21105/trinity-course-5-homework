@@ -48,4 +48,8 @@ export class GameController {
     return await this.game.buy(id, body.itemId);
   }
   // STEP 5: @Get('leaderboard')
+  @Get('leaderboard')
+  async leaderboard(@Query() query: PageQueryDto) {
+    return await this.game.leaderboard(query.page, query.limit);
+  }
 }

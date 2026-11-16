@@ -4,6 +4,7 @@
 
 import { Column, Entity, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn, Unique } from "typeorm";
 import { Item } from "./item.entity";
+import { Player } from "./player.entity";
 
 @Entity('inventory_items')
 @Unique(['playerId', 'itemId'])
@@ -23,4 +24,8 @@ export class InventoryItem {
     @ManyToOne(() => Item)
     @JoinColumn({ name: 'itemId' })
     item!: Item;
+    
+    @ManyToOne(() => Player, (player) => player.inventoryItems)
+    @JoinColumn({ name: 'playerId' })
+    player!: Player;
 }
