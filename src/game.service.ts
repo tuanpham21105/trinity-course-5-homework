@@ -19,10 +19,12 @@ export class GameService {
     {name: "Orc", icon: "👹"},
     {name: "Dragon", icon: "🐉"},
   ];
-
+  private monsterMaxHp(kills: number) {
+    return 8 + kills * 4;
+  }
   private mapMonster(kills: number, hp: number | undefined) {
     const monsterId = kills % 5;
-    const maxHp = 8 + kills * 4;
+    const maxHp = this.monsterMaxHp(kills);
     return {
       name: this.monsters[monsterId].name,
       icon: this.monsters[monsterId].icon,
@@ -41,6 +43,12 @@ export class GameService {
       kills: player.kills,
       monster: this.mapMonster(player.kills, player.monsterHp)
     };
+  }
+  private async findOneById(id: number) {
+    const player = await this.playersRepo.findOneBy({id: id});
+    if (!player)
+      throw new NotFoundException();
+    return player;
   }
 
   // STEP 1: items({ page, limit })
@@ -69,12 +77,30 @@ export class GameService {
     return this.convertToResponsePlayer(await this.playersRepo.save(created));
   }
   async findPlayer(id: number) {
-    const player = await this.playersRepo.findOneBy({id: id});
-    if (!player)
-      throw new NotFoundException();
+    const player = await this.findOneById(id);
     return this.convertToResponsePlayer(player);
   }
   // STEP 3: attack(id)
+  async attack(id: number) {
+    const player = await this.findOneById(id);
+    player.monsterHp = Math.max((player.monsterHp ?? this.monsterMaxHp(player.kills)) - 1, 0);
+    let isDefeated = false;
+    const rewardGold = 5 + player.kills * 2;
+    if (player.monsterHp === 0) {
+      isDefeated = true;
+      player.gold += rewardGold;
+      player.xp += 25;
+      player.kills++;
+      player.monsterHp = undefined;
+    }
+    const updatedPlayer = await this.playersRepo.save(player);
+    return {
+      damage: 1,
+      defeated: isDefeated,
+      reward: !isDefeated ? null : {gold: rewardGold, xp: 25},
+      player: this.convertToResponsePlayer(updatedPlayer)
+    };
+  }
   // STEP 4: inventory(id), buy(playerId, itemId), attackOf(playerId)
   // STEP 5: leaderboard({ page, limit }) without the N+1 problem
 }
