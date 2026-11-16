@@ -1,11 +1,17 @@
-import { Controller } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { GameService } from './game.service';
+import { DataSource } from 'typeorm';
 
 @Controller()
 export class GameController {
-  constructor(private readonly game: GameService) {}
+  constructor(private readonly game: GameService, private readonly dataSource: DataSource) {}
 
   // STEP 0: @Get('health')
+  @Get('health')
+  async health() {
+    await this.dataSource.query('SELECT 1');
+    return {db: "up"};
+  }
   // STEP 1: @Get('items')
   // STEP 2: @Post('players'), @Get('players/:id')
   // STEP 3: @Post('players/:id/attack')

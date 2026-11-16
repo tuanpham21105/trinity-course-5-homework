@@ -2,3 +2,8 @@
 // Export a default DataSource built from dbConfig.
 // entities: ['src/**/*.entity.ts']
 // migrations: ['src/database/migrations/*.ts']
+
+import { DataSource } from "typeorm";
+import { dbConfig } from "./db.config";
+
+export default new DataSource({ ...dbConfig, entities: ['src/**/*.entity.ts'], migrations: ['src/database/migrations/*.ts'] })
