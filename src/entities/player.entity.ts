@@ -17,7 +17,7 @@ export class Player {
     @Column({type: "int", default: 0})
     kills: number = 0;
     @Column({type: "int", nullable: true})
-    monsterHp: number | undefined;
+    monsterHp: number | null | undefined;
     @OneToMany(() => InventoryItem, (inventoryItem) => inventoryItem.player)
     inventoryItems!: InventoryItem[];
 }

@@ -23,7 +23,7 @@ export class GameService {
   private monsterMaxHp(kills: number) {
     return 8 + kills * 4;
   }
-  private mapMonster(kills: number, hp: number | undefined) {
+  private mapMonster(kills: number, hp: number | undefined | null) {
     const monsterId = kills % 5;
     const maxHp = this.monsterMaxHp(kills);
     return {
@@ -101,9 +101,15 @@ export class GameService {
       player.gold += rewardGold;
       player.xp += 25;
       player.kills++;
-      player.monsterHp = undefined;
+      player.monsterHp = null;
     }
     const updatedPlayer = await this.playersRepo.save(player);
+    console.log( {
+      damage: damage,
+      defeated: isDefeated,
+      reward: !isDefeated ? null : {gold: rewardGold, xp: 25},
+      player: await this.convertToResponsePlayer(updatedPlayer)
+    });
     return {
       damage: damage,
       defeated: isDefeated,
